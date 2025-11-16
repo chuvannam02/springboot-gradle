@@ -17,23 +17,30 @@ COPY src/ src/
 RUN --mount=type=cache,target=/root/.gradle ./gradlew --no-daemon clean bootJar \
     -Dspring-framework.version=6.2.11 \
     -Dtomcat.version=10.1.47
-
 # Extract the application dependencies
-RUN jar xf build/libs/spring-boot-template.jar
+RUN jar xf build/libs/springboot-gradle-0.0.1-SNAPSHOT.jar
 
 # Analyze the dependencies contained into the fat jar
 RUN jdeps --ignore-missing-deps -q  \
   --recursive  \
-  --multi-release 21  \
+  --multi-release 17  \
   --print-module-deps  \
   --class-path 'BOOT-INF/lib/*'  \
-  build/libs/spring-boot-template.jar > deps.info
+  build/libs/springboot-gradle-0.0.1-SNAPSHOT.jar > deps.info
 
+#💡 Tip: JDK 17 (eclipse-temurin) hỗ trợ compress 0, 1, 2 thôi, không có zip-9.
+#Nguyên nhân
+#Tùy chọn --compress của jlink chỉ nhận các giá trị:
+#0 → no compression
+#1 → minimal compression (fastest)
+#2 → maximal compression (smallest)
+# --multi-release 17  \ => --compress 2
+# --multi-release 21 \ => --compress zip-9
 # Create the custom JRE
 RUN jlink \
   --verbose \
   --add-modules $(cat deps.info) \
-  --compress zip-9 \
+  --compress 2 \
   --no-header-files \
   --no-man-pages \
   --output /custom_jre
@@ -53,10 +60,10 @@ COPY --from=healthcheck /bin/wget /usr/bin/wget
 WORKDIR /app
 
 # Copy application insights config
-COPY lib/applicationinsights.json ./
+#COPY lib/applicationinsights.json ./
 
 # Copy the built JAR
-COPY --from=build /app/build/libs/spring-boot-template.jar /app.jar
+COPY --from=build /app/build/libs/springboot-gradle-0.0.1-SNAPSHOT.jar /app.jar
 
 # Add labels
 LABEL org.opencontainers.image.source="https://github.com/hmcts/spring-boot-template" \

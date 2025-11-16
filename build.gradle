@@ -15,6 +15,11 @@ java {
 	}
 }
 
+bootJar {
+    archiveBaseName.set('springboot-gradle')
+    archiveVersion.set('0.0.1-SNAPSHOT')
+}
+
 configurations {
 	compileOnly {
 		extendsFrom annotationProcessor
