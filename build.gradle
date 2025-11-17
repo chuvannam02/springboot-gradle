@@ -6,6 +6,10 @@ plugins {
     id("maven-publish")
 }
 
+group = 'com.learning'
+version = '0.0.1-SNAPSHOT'
+description = 'Build Dockerfile Optimization Spring Gradle'
+
 publishing {
     repositories {
         maven {
@@ -20,14 +24,10 @@ publishing {
     publications {
         gpr(MavenPublication) {
             from(components.java)
+            suppressPomMetadataWarningsFor("dependencies-without-versions")
         }
     }
 }
-
-group = 'com.learning'
-version = '0.0.1-SNAPSHOT'
-description = 'Build Dockerfile Optimization Spring Gradle'
-
 java {
 	toolchain {
 		languageVersion = JavaLanguageVersion.of(17)
