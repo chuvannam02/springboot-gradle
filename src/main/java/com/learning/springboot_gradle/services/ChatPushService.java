@@ -1,4 +1,4 @@
-package com.learning.springboot_gradle;
+package com.learning.springboot_gradle.services;
 
 import com.learning.springboot_gradle.dtos.request.ChatMessage;
 import lombok.RequiredArgsConstructor;
