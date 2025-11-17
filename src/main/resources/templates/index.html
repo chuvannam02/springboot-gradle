@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>WebSocket Demo</title>
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+
+</head>
+<body>
+<h2>WebSocket + SSR Demo</h2>
+
+<button onclick="send()">Send Msg</button>
+
+<pre id="log"></pre>
+
+<script>
+    let stompClient = null;
+
+    function log(msg) {
+        document.getElementById("log").innerText += msg + "\n";
+    }
+
+    function connect() {
+        const socket = new SockJS("/ws");
+        stompClient = Stomp.over(socket);
+
+        stompClient.connect({}, () => {
+            log("Connected!");
+
+            stompClient.subscribe("/topic/messages", (message) => {
+                log("Received: " + message.body);
+            });
+        });
+    }
+
+    function send() {
+        const msg = {
+            sender: "Nam",
+            content: "Hello WebSocket!"
+        };
+
+        stompClient.send("/app/chat", {}, JSON.stringify(msg));
+    }
+
+    connect();
+</script>
+
+</body>
+</html>

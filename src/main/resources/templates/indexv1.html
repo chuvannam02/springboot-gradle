@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>WebSocket Advanced Demo</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+
+    <style>
+        #log { white-space: pre; background:#111; color:#0f0; padding:10px; height:300px; overflow:auto; }
+    </style>
+</head>
+<body>
+
+<h2>WebSocket + Ping/Pong + Auto Reconnect + Idle Timeout</h2>
+<button onclick="send()">Send message</button>
+
+<pre id="log"></pre>
+
+<script>
+    let stompClient = null;
+
+    // ----------- CONFIG --------------
+    const PING_INTERVAL = 10000;      // gửi ping mỗi 10s
+    const PING_TIMEOUT = 5000;        // 5s không có pong là xem như mất kết nối
+    const IDLE_TIMEOUT = 20000;       // 20s không thao tác → tự disconnect
+    const MAX_RETRY = 5;
+
+    // ----------- STATE --------------
+    let lastActivity = Date.now();
+    let retryCount = 0;
+    let pingTimer = null;
+    let pingTimeoutTimer = null;
+    let idleTimer = null;
+
+    function log(msg) {
+        const logDiv = document.getElementById("log");
+        logDiv.innerText += msg + "\n";
+        logDiv.scrollTop = logDiv.scrollHeight;
+    }
+
+    // =========================
+    //      MAIN CONNECT
+    // =========================
+    function connect() {
+        log("🟡 Connecting WebSocket...");
+
+        const socket = new SockJS("/ws");
+        stompClient = Stomp.over(socket);
+
+        stompClient.debug = () => {}; // tắt debug STOMP noise
+
+        stompClient.connect({}, onConnected, onError);
+    }
+
+    // =========================
+    //     ON CONNECTED
+    // =========================
+    function onConnected() {
+        log("🟢 CONNECTED to WebSocket!");
+
+        retryCount = 0;
+
+        stompClient.subscribe("/topic/messages", (msg) => {
+            log("📩 Received: " + msg.body);
+        });
+
+        stompClient.subscribe("/topic/pong", () => {
+            log("🏓 Pong received");
+            clearTimeout(pingTimeoutTimer);
+        });
+
+        startPing();
+        startIdleTimer();
+    }
+
+    // =========================
+    //     ON ERROR / DISCONNECT
+    // =========================
+    function onError() {
+        log("🔴 Connection lost!");
+
+        stopPing();
+        clearTimeout(idleTimer);
+
+        attemptReconnect();
+    }
+
+    // =========================
+    //     AUTO RECONNECT
+    // =========================
+    function attemptReconnect() {
+        if (retryCount >= MAX_RETRY) {
+            log("❌ Max retry reached — connection FAILED.");
+            return;
+        }
+
+        retryCount++;
+
+        const delay = Math.min(1000 * retryCount * 2, 10000);
+        log(`⏳ Retry #${retryCount} in ${delay / 1000}s...`);
+
+        setTimeout(() => {
+            connect();
+        }, delay);
+    }
+
+    // =========================
+    //      PING / PONG
+    // =========================
+    function startPing() {
+        stopPing();
+
+        pingTimer = setInterval(() => {
+            log("🏓 Sending ping...");
+            stompClient.send("/app/ping", {}, "ping");
+
+            pingTimeoutTimer = setTimeout(() => {
+                log("⛔ No pong - connection dead");
+                stompClient.disconnect(() => {});
+                onError();
+            }, PING_TIMEOUT);
+
+        }, PING_INTERVAL);
+    }
+
+    function stopPing() {
+        clearInterval(pingTimer);
+        clearTimeout(pingTimeoutTimer);
+    }
+
+    // =========================
+    //     IDLE TIMEOUT
+    // =========================
+    function startIdleTimer() {
+        clearInterval(idleTimer);
+
+        idleTimer = setInterval(() => {
+            if (Date.now() - lastActivity >= IDLE_TIMEOUT) {
+                log("⚠️ Idle timeout. Disconnecting...");
+                stompClient.disconnect(() => {
+                    log("⚪ Disconnected due to inactivity.");
+                });
+                clearInterval(idleTimer);
+            }
+        }, 2000);
+    }
+
+    function updateActivity() {
+        lastActivity = Date.now();
+
+        if (!stompClient || !stompClient.connected) {
+            log("🔄 User active → reconnect WebSocket...");
+            connect();
+        }
+    }
+
+    document.body.addEventListener("mousemove", updateActivity);
+    document.body.addEventListener("keydown", updateActivity);
+    document.body.addEventListener("click", updateActivity);
+
+    // =========================
+    //        SEND MESSAGE
+    // =========================
+    function send() {
+        updateActivity();
+
+        const msg = { sender: "Nam", content: "Hello!" };
+        stompClient.send("/app/chat", {}, JSON.stringify(msg));
+        log("📤 Sent: " + JSON.stringify(msg));
+    }
+
+    // START NOW
+    connect();
+</script>
+
+</body>
+</html>
